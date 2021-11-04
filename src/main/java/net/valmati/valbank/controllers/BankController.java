@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.hateoas.CollectionModel;
 import org.springframework.hateoas.EntityModel;
+import org.springframework.hateoas.IanaLinkRelations;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -44,16 +45,20 @@ public class BankController {
     }
 
     @PostMapping
-    public EntityModel<Bank> addBank(@RequestBody Bank bank) {
+    public ResponseEntity<EntityModel<Bank>> addBank(@RequestBody Bank bank) {
         logger.info("Adding " + bank);
 
         bank = bankRepository.save(bank);
 
-        return bankModelAssembler.toModel(bank);
+        var bankEntity = bankModelAssembler.toModel(bank);
+
+        return ResponseEntity
+                .created(bankEntity.getRequiredLink(IanaLinkRelations.SELF).toUri())
+                .body(bankEntity);
     }
 
     @PutMapping
-    public EntityModel<Bank> updateBank(@RequestBody Bank bank) {
+    public ResponseEntity<EntityModel<Bank>> updateBank(@RequestBody Bank bank) {
         logger.info("Updating bank with id " + bank.getId());
 
         var updatedBank = bankRepository.findById(bank.getId())
@@ -63,15 +68,20 @@ public class BankController {
                 })
                 .orElseThrow(() -> new BankNotFoundException(bank.getId()));
 
-        return bankModelAssembler.toModel(updatedBank);
+        var bankEntity = bankModelAssembler.toModel(updatedBank);
+
+        return ResponseEntity.ok(bankEntity);
     }
 
     @DeleteMapping("{id}")
     public ResponseEntity<HttpStatus> deleteBank(@PathVariable long id) {
         logger.info("Deleting bank " + id);
 
-        bankRepository.deleteById(id);
+        var bank = bankRepository.findById(id)
+                .orElseThrow(() -> new BankNotFoundException(id));
 
-        return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+        bankRepository.delete(bank);
+
+        return ResponseEntity.noContent().build();
     }
 }
